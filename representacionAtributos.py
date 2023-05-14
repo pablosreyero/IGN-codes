@@ -1,0 +1,150 @@
+import pandas as pd
+import numpy as np 
+import matplotlib.pyplot as plt
+import obspy 
+from obspy.clients.fdsn import Client
+client = Client("IRIS")
+from obspy import read, UTCDateTime as UTC
+from seismic_attributes import seismic_attributes as sa
+
+
+def lectura():
+    
+    #datos_cartagena = pd.read_csv('attribute_catalogue_backUp.csv')
+    stream = obspy.read("/Users/pablosreyero/Documents/Universidad/Practicas2022:2023/Prácticas IGN/ImagenesInformeFinal/CART10horas.mseed")
+    #Ahora, sacamos los atributos del evento del terremoto del CART a las 10:37
+
+    #t1 = UTC('2022-10-19T10:00:00.998393Z')
+    #t2 = UTC('2022-10-19T10:59:00.998393Z')
+
+    t1 = UTC('2022-10-19T10:37:00.998393Z')
+    t2 = UTC('2022-10-19T10:38:00.998393Z')
+
+    events = sa.get_events(stream, t1, t2, trigger_type='recstalta', sta=0.5, lta=10, thr_on=3, thr_off=1, thr_event_join=5)#sta y lta compara la media de las ultimas 100 muestras/segundos con el ruido de fondo y si aumenta mucho es un terremoto
+    #events = sa.get_events(stream1+stream2+stream3, t1, t2, trigger_type='multistalta', sta=0.5, lta=10, delta_sta=18, delta_lta=56, epsilon=10, avg_wave_speed=2, thr_event_join=10, thr_coincidence_sum=3)
+
+    events[0].to_csv('/Users/pablosreyero/Documents/Universidad/Practicas2022:2023/Prácticas IGN/15MarzoB/event_catalogueTerremotoCART.csv')  
+
+    attributes = sa.get_attributes(events, stream, sa.spectral_attributes)
+    print(attributes)
+    attributes.to_csv('/Users/pablosreyero/Documents/Universidad/Practicas2022:2023/Prácticas IGN/15MarzoB/atributosCARTTerremoto.csv')
+    datos_cartagena = pd.read_csv('/Users/pablosreyero/Documents/Universidad/Practicas2022:2023/Prácticas IGN/15MarzoB/atributosCARTTerremoto.csv')
+
+
+    datos_melilla = pd.read_csv('/Users/pablosreyero/Documents/Universidad/Practicas2022:2023/Prácticas IGN/15Marzo/attribute_catalogue_backUp.csv')
+    print(datos_melilla)
+
+    return datos_cartagena,datos_melilla
+
+def tratamiento_datos(datos_cartagena,datos_melilla):
+
+    #Ahora representamos los datos (recorremos cada columna y chequeamos el nombre de cada columna)
+    aux_cartagena = datos_cartagena.keys()
+    aux_melilla = datos_melilla.keys()
+    print('Atributos CART.mseed:  \n', aux_cartagena)
+    print('Atributos EMLI.mseed:  \n',aux_melilla)
+
+    aux_attributes_cartagena = []
+    aux_attributes_melilla = []
+
+    copia_lista_attributes_cartagena = datos_cartagena.copy()
+    copia_lista_attributes_melilla = datos_melilla.copy()
+   
+    for itera in datos_cartagena:
+        #print(itera)
+        if datos_cartagena[itera].isnull().values.any():
+            copia_lista_attributes_cartagena.pop(str(itera))
+    #print(copia_lista_attributes_cartagena.keys()) 
+
+    for iterador in copia_lista_attributes_cartagena:
+        if iterador[:9] == 'attribute':
+            aux_attributes_cartagena.append(str(iterador)) 
+    #print(aux_attributes_cartagena)
+
+    for itera1 in datos_melilla:
+        print(itera1)
+        if datos_melilla[itera1].isnull().values.any():
+            copia_lista_attributes_melilla.pop(str(itera1))
+    #print(copia_lista_attributes_melilla.keys()) 
+
+    for iterador1 in copia_lista_attributes_melilla:
+        if iterador1[:9] == 'attribute':
+            aux_attributes_melilla.append(str(iterador1)) 
+    #print(aux_attributes_melilla)
+
+    return aux_attributes_cartagena, aux_attributes_melilla
+    #Ahora solo tenemos las columnas de valores posibles y correctos
+def representacion(datos_cartagena,datos_melilla,aux_attributes_cartagena,aux_attributes_melilla):
+
+    print("Nos falta plotear los datos")
+    print('\n')
+    print("Ahora ploteamos la cantidad de atributos de cada ciudad:")
+    print('\n')
+    print("Numero de atributos en Cartagena: ", len(aux_attributes_cartagena))    
+    print('\n')
+    print("Numero de atributos en Melilla: ", len(aux_attributes_melilla))
+    print('\n')
+
+    #tenemos que relacionar cada atributo con su atributo, i.e: atributo 1 con atributo1
+    #primero establecemos el tamaño del subplot 
+    plt.rcParams["figure.figsize"] = [2, 2]
+    plt.rcParams["figure.autolayout"] = True
+
+    features = len(aux_attributes_cartagena)
+    if features % 10 != 0:
+        subplots = features + (10-(features % 10))
+    else:
+        subplots = features
+    #print(f'features: {features}')
+
+    cols = int(round(subplots/10))
+    rows = int(round(subplots/cols))
+    #print(f'subplots: {cols*rows}')
+    cartagena_attributes_normalized = []
+    fig = plt.figure()
+    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+    #for iter,attribute in enumerate(aux_attributes_cartagena):
+
+    for i in range(1,len(aux_attributes_cartagena)+1):
+        ax = fig.add_subplot(rows, cols, i)
+        #ax.text(0.5, 0.5, str((2, 3, i)),fontsize=18, ha='center')
+        cartagena_attributes = datos_cartagena[aux_attributes_cartagena[i-1]].tolist()
+        if aux_attributes_cartagena[i-1] not in aux_attributes_melilla:
+            """
+            cartagena_attributes_prime = [x for x in cartagena_attributes: (cartagena_attributes-cartagena_attributes.mean())/cartagena_attributes.std()]
+            for i in cartagena_attributes:
+                cartagena_attributes_prime = (cartagena_attributes-cartagena_attributes.mean())/cartagena_attributes.std()
+                cartagena_attributes_normalized.append(cartagena_attributes_prime)
+            #normalized_df=(cartagena_attributes-cartagena_attributes.mean())/cartagena_attributes.std()
+            """
+            ax.scatter(cartagena_attributes,[0]*len(cartagena_attributes),color = 'red')
+            print(cartagena_attributes)
+            ax.legend(['CART'])
+        else:
+            melilla_attributes = datos_melilla[aux_attributes_cartagena[i-1]]
+            ax.scatter(cartagena_attributes,[0]*len(cartagena_attributes),color = 'red')
+            ax.scatter(melilla_attributes,[0]*len(melilla_attributes), color = 'blue')
+            ax.legend(['CART', 'MELI'])
+            ax.set_xlabel("Magnitude")
+            ax.set_title(str(aux_attributes_cartagena[i-1]))
+
+    
+        
+    plt.show()
+
+
+def main():
+    #En este código vamos a llamar a las funciones
+    datos_cartagena, datos_melilla = lectura()
+    aux_attributes_cartagena,aux_attributes_melilla = tratamiento_datos(datos_cartagena,datos_melilla)
+    print('\n')
+    print(aux_attributes_cartagena)
+    print('\n')
+    print(aux_attributes_melilla)
+
+    #Ahora llamamos a la funcion de representacion:
+    representacion(datos_cartagena,datos_melilla,aux_attributes_cartagena,aux_attributes_melilla)
+
+
+
+main()
